@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Scholar PDF</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #141414;
+  --surface: #1e1e1e;
+  --surface2: #282828;
+  --border: #2e2e2e;
+  --text: #e8e8e8;
+  --text-muted: #666;
+  --text-dim: #999;
+  --accent: #6c63ff;
+  --accent-hover: #7d75ff;
+  --accent-glow: rgba(108,99,255,0.15);
+  --red: #ff5f5f;
+  --green: #4ade80;
+  --yellow: #fbbf24;
+  --shadow: 0 8px 32px rgba(0,0,0,0.6);
+  --toolbar-h: 52px;
+  --toolbox-w: 52px;
+  --sidebar-w: 220px;
+  --radius: 8px;
+}
+body.light {
+  --bg: #e8e8e8;
+  --surface: #f5f5f5;
+  --surface2: #ebebeb;
+  --border: #d4d4d4;
+  --text: #1a1a1a;
+  --text-muted: #aaa;
+  --text-dim: #777;
+  --shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:'DM Sans',system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  font-size:13px;
+  user-select:none;
+}
+
+/* ─── LOADING ─────────────────────────────────────── */
+#loading{
+  position:fixed;inset:0;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;z-index:99999;
+}
+#loading.gone{display:none;}
+.spinner{
+  width:36px;height:36px;
+  border:2.5px solid var(--border);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+#load-text{font-size:13px;color:var(--text-muted);font-family:'DM Mono',monospace;}
+#load-bar-wrap{width:180px;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+#load-bar{height:100%;background:var(--accent);width:0%;transition:width .3s;}
+
+/* ─── TOAST ────────────────────────────────────────── */
+#toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(8px);
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);padding:9px 18px;border-radius:var(--radius);
+  font-size:12.5px;z-index:99999;opacity:0;pointer-events:none;
+  transition:opacity .25s,transform .25s;white-space:nowrap;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ─── AI OVERLAY ───────────────────────────────────── */
+#ai-overlay{
+  position:fixed;inset:0;z-index:9990;display:none;
+  cursor:crosshair;background:rgba(108,99,255,.04);
+}
+#ai-overlay.on{display:block;}
+#ai-sel{
+  position:absolute;
+  border:2px dashed var(--accent);
+  background:rgba(108,99,255,.1);
+  border-radius:2px;pointer-events:none;
+}
+
+/* ─── AI CHOICE DIALOG ─────────────────────────────── */
+.ai-dialog{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:24px 28px;z-index:99999;
+  display:flex;flex-direction:column;align-items:center;gap:14px;
+  box-shadow:var(--shadow);min-width:300px;
+}
+.ai-dialog h3{font-size:15px;font-weight:600;}
+.ai-dialog p{font-size:12px;color:var(--text-dim);text-align:center;line-height:1.6;}
+.ai-btns{display:flex;gap:10px;}
+.ai-btn{
+  padding:9px 20px;border-radius:var(--radius);border:1px solid;
+  font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;
+  transition:opacity .15s;
+}
+.ai-btn:hover{opacity:.85;}
+.ai-btn.claude{background:rgba(180,100,255,.12);border-color:rgba(180,100,255,.4);color:#c084fc;}
+.ai-btn.gemini{background:rgba(66,133,244,.12);border-color:rgba(66,133,244,.4);color:#60a5fa;}
+.ai-close{background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;margin-top:-4px;}
+
+/* ─── TOPBAR ───────────────────────────────────────── */
+#topbar{
+  height:var(--toolbar-h);
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;
+  padding:0 12px;gap:7px;
+  flex-shrink:0;z-index:100;
+}
+.t-sep{width:1px;height:22px;background:var(--border);margin:0 3px;flex-shrink:0;}
+.t-flex{flex:1;}
+.t-btn{
+  height:30px;padding:0 10px;
+  background:transparent;border:1px solid transparent;
+  color:var(--text-dim);border-radius:6px;cursor:pointer;
+  font-family:inherit;font-size:12.5px;font-weight:500;
+  display:flex;align-items:center;gap:5px;
+  transition:all .15s;white-space:nowrap;flex-shrink:0;
+}
+.t-btn:hover{background:var(--surface2);border-color:var(--border);color:var(--text);}
+.t-btn.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent);}
+#filename{
+  font-size:12.5px;color:var(--text-dim);
+  max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:'DM Mono',monospace;
+}
+.page-nav{display:flex;align-items:center;gap:5px;}
+.page-nav input{
+  width:42px;text-align:center;
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);border-radius:5px;padding:3px 4px;
+  font-family:'DM Mono',monospace;font-size:12px;
+}
+.page-nav span{font-size:12px;color:var(--text-muted);}
+#zoom-label{font-size:12px;color:var(--text-dim);min-width:38px;text-align:center;font-family:'DM Mono',monospace;}
+#search-wrap{position:relative;display:flex;align-items:center;}
+#search-input{
+  width:155px;height:28px;
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);border-radius:6px;padding:0 8px 0 28px;
+  font-family:inherit;font-size:12px;
+  transition:border-color .15s;
+}
+#search-input:focus{outline:none;border-color:var(--accent);}
+#search-input::placeholder{color:var(--text-muted);}
+.search-icon{position:absolute;left:8px;color:var(--text-muted);font-size:12px;pointer-events:none;}
+#search-count{font-size:11px;color:var(--text-muted);min-width:50px;font-family:'DM Mono',monospace;}
+
+/* ─── MAIN AREA ────────────────────────────────────── */
+#main{display:flex;flex:1;overflow:hidden;}
+
+/* ─── TOOLBOX ──────────────────────────────────────── */
+#toolbox{
+  width:var(--toolbox-w);background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;
+  padding:8px 0;gap:2px;flex-shrink:0;overflow-y:auto;z-index:50;
+}
+.tool{
+  width:36px;height:36px;border-radius:7px;
+  background:transparent;border:1px solid transparent;
+  color:var(--text-muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;transition:all .15s;position:relative;
+  flex-shrink:0;
+}
+.tool:hover{background:var(--surface2);color:var(--text);}
+.tool.on{background:var(--accent-glow);border-color:var(--accent);color:var(--accent);}
+.tool-sep{width:24px;height:1px;background:var(--border);margin:3px 0;flex-shrink:0;}
+.tool-tip{
+  position:absolute;left:44px;top:50%;transform:translateY(-50%);
+  background:#111;border:1px solid var(--border);
+  color:#ddd;padding:4px 9px;border-radius:5px;
+  font-size:11px;white-space:nowrap;pointer-events:none;
+  opacity:0;transition:opacity .15s;z-index:999;
+  font-family:'DM Sans',sans-serif;
+}
+.tool:hover .tool-tip{opacity:1;}
+
+/* Color dots in toolbox */
+.c-dot{
+  width:18px;height:18px;border-radius:50%;
+  border:2px solid transparent;cursor:pointer;
+  transition:transform .1s,border-color .1s;flex-shrink:0;
+}
+.c-dot:hover{transform:scale(1.25);}
+.c-dot.on{border-color:#fff;}
+#color-custom{
+  width:18px;height:18px;border-radius:50%;
+  border:2px solid var(--border);cursor:pointer;
+  padding:0;overflow:hidden;background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);
+  flex-shrink:0;
+}
+#opacity-wrap{
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:4px 0;
+}
+#opacity-wrap span{font-size:9px;color:var(--text-muted);letter-spacing:.5px;}
+#opacity-range{
+  writing-mode:vertical-lr;direction:rtl;
+  width:4px;height:48px;accent-color:var(--accent);cursor:pointer;
+}
+
+/* ─── SIDEBAR ──────────────────────────────────────── */
+#sidebar{
+  width:var(--sidebar-w);background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;
+  transition:width .2s;
+}
+#sidebar.closed{width:0;}
+.stabs{display:flex;border-bottom:1px solid var(--border);}
+.stab{
+  flex:1;padding:9px 4px;font-size:11.5px;font-weight:500;
+  text-align:center;cursor:pointer;
+  color:var(--text-muted);border-bottom:2px solid transparent;
+  transition:all .15s;
+}
+.stab.on{color:var(--accent);border-bottom-color:var(--accent);}
+.spanel{flex:1;overflow-y:auto;display:none;}
+.spanel.on{display:block;}
+
+/* Thumbnail items */
+.thumb{
+  padding:10px 8px;cursor:pointer;
+  border-bottom:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  transition:background .1s;
+}
+.thumb:hover{background:rgba(255,255,255,.03);}
+.thumb.on{background:var(--accent-glow);}
+.thumb canvas{max-width:160px;box-shadow:0 2px 8px rgba(0,0,0,.5);border-radius:2px;}
+.thumb span{font-size:10px;color:var(--text-muted);font-family:'DM Mono',monospace;}
+
+/* Annotations list */
+.alist-empty{padding:20px;text-align:center;font-size:12px;color:var(--text-muted);line-height:1.7;}
+.aitem{
+  padding:9px 10px;border-bottom:1px solid var(--border);
+  cursor:pointer;display:flex;gap:8px;align-items:flex-start;
+  transition:background .1s;
+}
+.aitem:hover{background:rgba(255,255,255,.03);}
+.aitem-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.aitem-body{flex:1;min-width:0;}
+.aitem-type{font-size:12px;font-weight:600;}
+.aitem-page{font-size:10px;color:var(--text-muted);font-family:'DM Mono',monospace;}
+.aitem-text{font-size:11px;color:var(--text-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.aitem-del{color:var(--text-muted);cursor:pointer;font-size:13px;padding:0 2px;flex-shrink:0;}
+.aitem-del:hover{color:var(--red);}
+
+/* ─── PDF SCROLL ───────────────────────────────────── */
+#scroll{
+  flex:1;overflow:auto;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;
+  padding:24px 24px 60px;gap:20px;
+}
+#scroll::-webkit-scrollbar{width:5px;height:5px;}
+#scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+#scroll::-webkit-scrollbar-thumb:hover{background:#444;}
+
+.page-wrap{
+  position:relative;flex-shrink:0;line-height:0;
+  box-shadow:0 4px 24px rgba(0,0,0,.55);
+  border-radius:2px;
+}
+canvas.pdf-c{display:block;}
+body.dark-pdf canvas.pdf-c{filter:invert(1) hue-rotate(180deg);}
+.txt-layer{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  overflow:hidden;opacity:.15;pointer-events:auto;
+}
+.txt-layer span{
+  position:absolute;white-space:pre;transform-origin:0 0;
+  cursor:text;color:transparent;
+}
+.txt-layer ::selection{background:rgba(108,99,255,.35);}
+canvas.ann-c{
+  position:absolute;top:0;left:0;
+  pointer-events:none;
+}
+canvas.ann-c.draw{pointer-events:all;cursor:crosshair;}
+.note-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
+
+/* ─── STICKY NOTES ─────────────────────────────────── */
+.sticky{
+  position:absolute;
+  background:#fef08a;color:#1c1c1c;
+  border-radius:6px;padding:7px 8px;
+  min-width:130px;max-width:210px;
+  box-shadow:2px 3px 10px rgba(0,0,0,.4);
+  pointer-events:all;z-index:10;
+  border-top:3px solid #ca8a04;
+}
+.sticky-bar{
+  display:flex;justify-content:space-between;align-items:center;
+  cursor:move;padding-bottom:4px;
+  font-size:10px;font-weight:600;color:#78716c;letter-spacing:.5px;
+}
+.sticky-x{cursor:pointer;font-size:14px;color:#a8a29e;line-height:1;}
+.sticky-x:hover{color:#ef4444;}
+.sticky textarea{
+  background:transparent;border:none;outline:none;
+  resize:none;font-size:12px;color:#1c1c1c;
+  width:100%;min-height:55px;font-family:'DM Sans',sans-serif;
+  line-height:1.5;
+}
+
+/* ─── TEXT ANNOT ───────────────────────────────────── */
+.text-annot{
+  position:absolute;font-size:13px;font-weight:600;
+  pointer-events:all;cursor:move;
+  text-shadow:0 1px 3px rgba(0,0,0,.5);
+  min-width:60px;outline:none;
+}
+
+/* ─── PAGE LABEL ───────────────────────────────────── */
+.page-label{
+  position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);
+  font-size:10.5px;color:var(--text-muted);
+  font-family:'DM Mono',monospace;pointer-events:none;
+}
+
+/* ─── SEARCH HIGHLIGHT ─────────────────────────────── */
+.search-hl{
+  position:absolute;background:rgba(251,191,36,.35);
+  border:1px solid rgba(251,191,36,.6);pointer-events:none;border-radius:1px;
+}
+.search-hl.current{background:rgba(251,191,36,.65);border-color:#fbbf24;}
+
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+/* Placeholder pages before lazy render */
+.page-placeholder{
+  background:var(--surface) !important;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:2px;
+  box-shadow:0 4px 24px rgba(0,0,0,.55);
+}
+.page-placeholder::before{
+  content:'';width:28px;height:28px;
+  border:2.5px solid var(--border);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+</style>
+</head>
+<body class="dark-pdf">
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div id="load-text">Initializing Scholar…</div>
+  <div id="load-bar-wrap"><div id="load-bar"></div></div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- AI Overlay for area capture -->
+<div id="ai-overlay"><div id="ai-sel"></div></div>
+
+<!-- ─── TOP BAR ───────────────────────────────────────────────── -->
+<div id="topbar">
+  <button class="t-btn" id="btn-sidebar">☰</button>
+  <div class="t-sep"></div>
+  <span id="filename">Scholar PDF</span>
+  <div class="t-sep"></div>
+
+  <div class="page-nav">
+    <button class="t-btn" id="btn-prev">‹</button>
+    <input type="number" id="page-input" value="1" min="1">
+    <span id="page-of">/ —</span>
+    <button class="t-btn" id="btn-next">›</button>
+  </div>
+
+  <div class="t-sep"></div>
+  <button class="t-btn" id="btn-zout">−</button>
+  <span id="zoom-label">150%</span>
+  <button class="t-btn" id="btn-zin">+</button>
+  <button class="t-btn" id="btn-fw" title="Fit Width">↔</button>
+  <button class="t-btn" id="btn-fp" title="Fit Page">⊡</button>
+
+  <div class="t-sep"></div>
+  <div id="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input type="text" id="search-input" placeholder="Search PDF…">
+  </div>
+  <span id="search-count"></span>
+  <button class="t-btn" id="btn-sprev" title="Previous match">↑</button>
+  <button class="t-btn" id="btn-snext" title="Next match">↓</button>
+
+  <div class="t-sep"></div>
+  <button class="t-btn" id="btn-dark">☀ Light</button>
+
+  <div class="t-flex"></div>
+
+  <button class="t-btn" id="btn-claude" style="color:#c084fc;border-color:rgba(192,132,252,.3)">✦ Ask Claude</button>
+  <button class="t-btn" id="btn-gemini" style="color:#60a5fa;border-color:rgba(96,165,250,.3)">◈ Ask Gemini</button>
+  <div class="t-sep"></div>
+  <button class="t-btn" id="btn-dl" style="color:var(--green);border-color:rgba(74,222,128,.3)">↓ Export PDF</button>
+</div>
+
+<!-- ─── MAIN ──────────────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- Toolbox -->
+  <div id="toolbox">
+    <button class="tool on" data-tool="select">▲<span class="tool-tip">Select / Pan</span></button>
+    <div class="tool-sep"></div>
+    <button class="tool" data-tool="highlight">▬<span class="tool-tip">Highlight Text</span></button>
+    <button class="tool" data-tool="underline" style="text-decoration:underline;font-weight:700">T<span class="tool-tip">Underline Text</span></button>
+    <button class="tool" data-tool="strikethrough" style="text-decoration:line-through;font-weight:700">T<span class="tool-tip">Strikethrough</span></button>
+    <div class="tool-sep"></div>
+    <button class="tool" data-tool="pen">✏<span class="tool-tip">Freehand Pen</span></button>
+    <button class="tool" data-tool="rect">▭<span class="tool-tip">Rectangle</span></button>
+    <button class="tool" data-tool="arrow">➝<span class="tool-tip">Arrow</span></button>
+    <button class="tool" data-tool="note">🗒<span class="tool-tip">Sticky Note</span></button>
+    <button class="tool" data-tool="text-a" style="font-weight:700;font-size:14px">A<span class="tool-tip">Text Label</span></button>
+    <div class="tool-sep"></div>
+    <button class="tool" data-tool="eraser">⌫<span class="tool-tip">Eraser</span></button>
+    <div class="tool-sep"></div>
+    <!-- Color dots -->
+    <div id="color-dots" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:2px 0;"></div>
+    <input type="color" id="color-custom" title="Custom color" value="#a855f7">
+    <div class="tool-sep"></div>
+    <div id="opacity-wrap">
+      <span>OPACITY</span>
+      <input type="range" id="opacity-range" min="10" max="90" value="40" orient="vertical">
+    </div>
+    <div class="tool-sep"></div>
+    <button class="tool" data-tool="ai-area" style="font-size:12px">📸<span class="tool-tip">Capture for AI</span></button>
+  </div>
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="stabs">
+      <div class="stab on" data-panel="thumbs">Pages</div>
+      <div class="stab" data-panel="annots">Notes</div>
+    </div>
+    <div class="spanel on" id="panel-thumbs"></div>
+    <div class="spanel" id="panel-annots">
+      <div class="alist-empty">No annotations yet.<br>Use the tools on the left to start annotating.</div>
+    </div>
+  </div>
+
+  <!-- PDF Viewer -->
+  <div id="scroll"></div>
+</div>
+
+<script src="lib/pdf.min.js"></script>
+<script src="lib/pdf-lib.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

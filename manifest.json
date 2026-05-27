@@ -1,0 +1,19 @@
+{
+  "manifest_version": 2,
+  "name": "Scholar: Dark Mode PDF Viewer",
+  "version": "2.0",
+  "description": "Intercepts all PDFs in Brave. Dark mode, highlights, annotations, AI.",
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "<all_urls>",
+    "tabs",
+    "clipboardWrite"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+  "web_accessible_resources": ["viewer.html", "lib/*"],
+  "icons": {}
+}
