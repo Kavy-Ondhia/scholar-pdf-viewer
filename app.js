@@ -10,6 +10,7 @@ let pdfDoc=null, pdfBytes=null, scale=1.5;
 let tool='select', penColor='#fbbf24', penOpacity=0.45;
 let annotations=[], searchIDs=[], searchIdx=-1;
 let currentPage=1, darkPDF=true, sidebarOpen=true;
+let hiddenPages = new Set();
 const scroll=document.getElementById('scroll');
 
 // ─── HELPERS ───────────────────────────────────────────────────────
@@ -89,6 +90,101 @@ document.querySelectorAll('.stab').forEach(tab=>{
     tab.classList.add('on');
     document.getElementById('panel-'+tab.dataset.panel).classList.add('on');
   });
+});
+
+// ─── FOCUS MODE LOGIC ─────────────────────────────────────────────
+function applyFocusMode() {
+    const input = document.getElementById('focus-input').value.trim();
+    if (!pdfDoc) return; // Prevent errors if clicked before PDF loads
+    const totalPages = pdfDoc.numPages; 
+    let visibleSet = new Set();
+
+    // 1. Parse the input string (e.g., "1-5, 8, 11-13")
+    if (input) {
+        const parts = input.split(',');
+        for (let part of parts) {
+            part = part.trim();
+            if (part.includes('-')) {
+                let [start, end] = part.split('-').map(Number);
+                if (start && end && start <= end) {
+                    for (let i = start; i <= end; i++) visibleSet.add(i);
+                }
+            } else {
+                let num = Number(part);
+                if (num) visibleSet.add(num);
+            }
+        }
+    }
+
+    hiddenPages.clear();
+
+    // 2. Loop through every page and toggle CSS display using querySelector
+    for (let i = 1; i <= totalPages; i++) {
+        // CORRECTED: Target the data-page attribute instead of an ID
+        const pageDiv = document.querySelector(`.page-wrap[data-page="${i}"]`); 
+        const thumbDiv = document.querySelector(`.thumb[data-page="${i}"]`); 
+        
+        if (input && !visibleSet.has(i)) {
+            // Hide it
+            hiddenPages.add(i);
+            if (pageDiv) pageDiv.style.display = 'none';
+            if (thumbDiv) thumbDiv.style.display = 'none';
+        } else {
+            // Show it
+            if (pageDiv) pageDiv.style.display = 'flex'; // Wrap elements use flex
+            if (thumbDiv) thumbDiv.style.display = 'flex';
+        }
+    }
+}
+
+document.getElementById('btn-focus-export').addEventListener('click', async () => {
+    if (hiddenPages.size === 0) {
+        toast("No pages hidden. Use the normal Export button.", 2600);
+        return;
+    }
+    
+    setLoad(true, "Extracting Focused Pages...");
+    
+    try {
+        // Load the original bytes into a new pdf-lib document
+        const originalDoc = await PDFLib.PDFDocument.load(pdfBytes); 
+        const newDoc = await PDFLib.PDFDocument.create();
+        
+        const totalPages = originalDoc.getPageCount();
+        const pagesToCopy = [];
+
+        // pdf-lib uses 0-based indexing, but our UI uses 1-based indexing
+        for (let i = 0; i < totalPages; i++) {
+            if (!hiddenPages.has(i + 1)) {
+                pagesToCopy.push(i);
+            }
+        }
+
+        // Copy and assemble the new document
+        const copiedPages = await newDoc.copyPages(originalDoc, pagesToCopy);
+        copiedPages.forEach((page) => newDoc.addPage(page));
+
+        // Trigger download
+        const newPdfBytes = await newDoc.save();
+        const blob = new Blob([newPdfBytes], { type: "application/pdf" });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = "scholar_focused_datasheet.pdf";
+        link.click();
+        
+    } catch (e) {
+        console.error("Export failed:", e);
+        toast("Failed to export focused PDF.", 2600);
+    }
+    
+    setLoad(false);
+});
+
+// Bind the Apply and Reset buttons
+document.getElementById('btn-focus-apply').addEventListener('click', applyFocusMode);
+document.getElementById('btn-focus-reset').addEventListener('click', () => {
+    document.getElementById('focus-input').value = '';
+    applyFocusMode(); // Re-running with empty input unhides everything
 });
 
 // ─── LOAD PDF ──────────────────────────────────────────────────────
@@ -213,7 +309,14 @@ async function renderPageIntoWrap(num, wrap){
   // PDF Canvas
   const pdfC=document.createElement('canvas');
   pdfC.className='pdf-c';
-  pdfC.width=vp.width; pdfC.height=vp.height;
+  
+  // Scale for high-DPI displays
+  const outputScale = window.devicePixelRatio || 1;
+  pdfC.width = Math.floor(vp.width * outputScale);
+  pdfC.height = Math.floor(vp.height * outputScale);
+  pdfC.style.width = Math.floor(vp.width) + 'px';
+  pdfC.style.height = Math.floor(vp.height) + 'px';
+  
   wrap.appendChild(pdfC);
 
   // Text layer
@@ -238,7 +341,12 @@ async function renderPageIntoWrap(num, wrap){
   lbl.className='page-label'; lbl.textContent=num;
   wrap.appendChild(lbl);
 
-  await page.render({canvasContext:pdfC.getContext('2d'),viewport:vp}).promise;
+  const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+  await page.render({
+    canvasContext: pdfC.getContext('2d'),
+    transform: transform,
+    viewport: vp
+  }).promise;
 
   try{
     const tc=await page.getTextContent();

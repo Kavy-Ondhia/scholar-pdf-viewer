@@ -456,6 +456,15 @@ canvas.ann-c.draw{pointer-events:all;cursor:crosshair;}
       <div class="stab on" data-panel="thumbs">Pages</div>
       <div class="stab" data-panel="annots">Notes</div>
     </div>
+    <div id="focus-panel" style="padding: 10px; border-bottom: 1px solid var(--border);">
+      <input type="text" id="focus-input" placeholder="Pages (e.g. 1-5, 8, 11-13)" 
+            style="width: 100%; padding: 6px; margin-bottom: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); box-sizing: border-box; font-family: 'DM Mono', monospace; font-size: 12px;">
+      <div style="display: flex; gap: 5px;">
+        <button id="btn-focus-apply" class="tool" style="flex: 1; font-size: 12px;">Apply</button>
+        <button id="btn-focus-reset" class="tool" style="flex: 1; font-size: 12px;">Reset</button>
+        <button id="btn-focus-export" class="tool" style="flex: 1; font-size: 12px; color: var(--accent);">Export</button>
+      </div>
+    </div>
     <div class="spanel on" id="panel-thumbs"></div>
     <div class="spanel" id="panel-annots">
       <div class="alist-empty">No annotations yet.<br>Use the tools on the left to start annotating.</div>
