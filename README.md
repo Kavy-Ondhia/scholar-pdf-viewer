@@ -14,6 +14,10 @@ A robust, Manifest V3 browser extension designed to natively render and display 
 
 ### ✨ Comprehensive Feature List
 
+**🎯 Focus Mode & Page Extraction (New!)**
+* **Datasheet Decluttering:** Typing specific page ranges (e.g., `1-5, 8, 11-13`) instantly hides irrelevant pages from the viewer, perfect for navigating massive 1000+ page microcontroller datasheets.
+* **Targeted Export:** Click "Export Subset" to generate and download a brand new, lightweight PDF containing *only* your currently visible pages using `pdf-lib`.
+
 **Core Viewing Experience**
 * **Seamless Interception:** Automatically intercepts and opens all PDFs in the browser (supports both local files and web URLs).
 * **Theme Toggle:** Instantly switch between Dark mode and Light mode with a single toolbar click.
